@@ -59,7 +59,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %dir /##APP_BUILD_ROOT##/%{name}
-%defattr(-,root,root,-)
+%defattr(-,##APP_USER##,##APP_USER##,-)
 ##APP_FILES##
 
 %post
