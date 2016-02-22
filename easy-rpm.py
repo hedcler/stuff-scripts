@@ -7,10 +7,11 @@
 # @usage:
 # cd [PATH_OF_FILES]
 # find . -iname "*" -not -path "*/\.*" -not -name "*pyc" -printf '%P\n' > /tmp/my_app_files
+# git log --format='* %ai - %cn <%ce>%n-%h - %s%n' --first-parent > /tmp/my_app_changelog
 # cd -
 # ./easy-rpm.py --name "my-app" --version 1.1.0 --release 2 --desc "My Example Application" \
 # --url "http://myapp.com" --rpmgroup "My Applications" --sfiles /tmp/my_app_files \
-# --dfiles "/opt/myapp" --user myapp_user > /tmp/MY_APP_SPEC
+# --dfiles "/opt/myapp" --user myapp_user --changelog /tmp/my_app_changelog > /tmp/MY_APP_SPEC
 #
 import os
 import re
@@ -63,12 +64,16 @@ rm -rf $RPM_BUILD_ROOT
 ##APP_FILES##
 
 %post
-chmod 755 -R /##APP_BUILD_ROOT##/%{name}"""
+chmod 755 -R /##APP_BUILD_ROOT##/%{name}
+
+%changelog
+##APP_CHANGELOG##"""
 
 parser = optparse.OptionParser()
 parser.add_option('--name', '--NAME', help='Name', dest='name', action='store', default='')
 parser.add_option('--version', '--VERSION', help='Version', dest='version', action='store', default='1.0')
 parser.add_option('--user', '--USER', help='User to run application', dest='user', action='store', default='nobody')
+parser.add_option('--changelog', '--CHANGELOG', help='Application changelog file', dest='changelog', action='store', default='')
 parser.add_option('--release', '--RELEASE', help='Release', dest='release', action='store', default='1')
 parser.add_option('--desc', '--DESCRIPTION', help='Brief description', dest='desc', action='store', default='')
 parser.add_option('--cdesc', '--COMPLETE_DESCRIPTION', help='Complete description', dest='cdesc', action='store', default='')
@@ -79,7 +84,7 @@ parser.add_option('--sfiles', '--SOURCE_FILES', help='Source files', dest='rpmfi
 parser.add_option('--dfiles', '--DESTINATION_FILES', help='Destination to files be installed', dest='buildroot', action='store', default='opt')
 
 nt = 0
-options = ['name',  'version', 'user', 'release', 'desc', 'cdesc', 'url', 'license', 'rpmgroup', 'rpmfiles']
+options = ['name',  'version', 'user', 'changelog', 'release', 'desc', 'cdesc', 'url', 'license', 'rpmgroup', 'rpmfiles']
 
 (opts, args) = parser.parse_args()
 
@@ -112,9 +117,14 @@ if opts.rpmfiles != '':
 if opts.cdesc == '':
     opts.cdesc = opts.desc
 
+if opts.changelog is not '':
+    with open(opts.changelog, "r") as _chlog:
+        chlog = _chlog.read()
+        
 _file = (SPEC.replace('##APP_NAME##', opts.name)
              .replace('##APP_VERSION##', opts.version)
              .replace('##APP_USER##', opts.user)
+             .replace('##APP_CHANGELOG##', chlog)
              .replace('##APP_RELEASE##', opts.release)
              .replace('##APP_DESCRIPTION##', opts.desc)
              .replace('##APP_COMPLETE_DESCRIPTION##', opts.cdesc)
