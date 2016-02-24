@@ -21,13 +21,13 @@ DIR = os.path.dirname(os.path.realpath(__file__))
 SPEC = """
 Name:           ##APP_NAME##
 Version:        ##APP_VERSION##
-Release:        ##APP_RELEASE##%{?dist}
+Release:        ##APP_RELEASE##
 Summary:        ##APP_DESCRIPTION##
 
 Group:          ##APP_GROUP_RPM##
 License:        ##APP_LICENSE##
 URL:            ##APP_URL##
-Source0:        ##APP_NAME##-%{version}.tar.gz
+Source0:        %{name}-%{version}-rel-%{release}.tar.gz
 BuildArch:      noarch
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -41,30 +41,35 @@ Requires(postrun): /usr/sbin/userdel
 
 %prep
 %define _unpackaged_files_terminate_build 0
+%define _rpmfilename %{arch}/%{name}-%{version}-rel-%{release}.%{arch}.rpm
 
-%setup -q
+%setup -n %{name}-%{version}-rel-%{release}
 
 %build
 
 %pre
 /usr/bin/getent group ##APP_USER## || /usr/sbin/groupadd -r ##APP_USER##
-/usr/bin/getent passwd ##APP_USER## || /usr/sbin/useradd -r -d $RPM_BUILD_ROOT -s /sbin/nologin ##APP_USER##
+/usr/bin/getent passwd ##APP_USER## || /usr/sbin/useradd -r -g ##APP_USER## -d /##APP_BUILD_ROOT##/%{name}-%{version}-rel-%{release} -s /sbin/nologin ##APP_USER##
 
 %install
 rm -rf $RPM_BUILD_ROOT
-install -d $RPM_BUILD_ROOT/##APP_BUILD_ROOT##/%{name}
+install -d $RPM_BUILD_ROOT/##APP_BUILD_ROOT##/%{name}-%{version}-rel-%{release}
 ##APP_FILES_INSTALL_LIST##
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files
-%dir /##APP_BUILD_ROOT##/%{name}
+%dir /##APP_BUILD_ROOT##/%{name}-%{version}-rel-%{release}
 %defattr(-,##APP_USER##,##APP_USER##,-)
 ##APP_FILES##
 
 %post
-chmod 755 -R /##APP_BUILD_ROOT##/%{name}
+chown ##APP_USER##:##APP_USER## -R /##APP_BUILD_ROOT##/%{name}-%{version}-rel-%{release}
+chmod 755 -R /##APP_BUILD_ROOT##/%{name}-%{version}-rel-%{release}
+
+%postun
+/usr/sbin/userdel -r ##APP_USER## >/dev/null 2>&1
 
 %changelog
 ##APP_CHANGELOG##"""
@@ -101,18 +106,20 @@ if opts.buildroot.startswith('/'):
     opts.buildroot = opts.buildroot[1:]
 
 if opts.rpmfiles != '':
+    rpmname = '%s-%s-rel-%s' % (opts.name, opts.version, opts.release)
+
     with open(opts.rpmfiles, 'r') as rf:
         for rl in rf.readlines():
             frl = rl.strip()
-            frl = re.sub(r'^%s-%s\/' % (opts.name, opts.version), '', frl)
+            frl = re.sub(r'^%s\/' % rpmname, '', frl)
 
             if len(frl)>1:
                 fdir = re.search(r'(.*)(\/)$', frl, re.M|re.I)
                 if fdir:
-                    rpmfiles += "install -d %s $RPM_BUILD_ROOT/%s/%s/%s\n" % (frl, opts.buildroot, opts.name, frl)
+                    rpmfiles += "install -d %s $RPM_BUILD_ROOT/%s/%s/%s\n" % (frl, opts.buildroot, rpmname, frl)
                 else:
-                    filelist += "/%s/%s/%s\n" % (opts.buildroot, opts.name, frl)
-                    rpmfiles += "install %s $RPM_BUILD_ROOT/%s/%s/%s\n" % (frl, opts.buildroot, opts.name, frl)
+                    filelist += "/%s/%s/%s\n" % (opts.buildroot, rpmname, frl)
+                    rpmfiles += "install %s $RPM_BUILD_ROOT/%s/%s/%s\n" % (frl, opts.buildroot, rpmname, frl)
 
 if opts.cdesc == '':
     opts.cdesc = opts.desc
